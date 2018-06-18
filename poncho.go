@@ -74,16 +74,16 @@ func main() {
 	longitude := parsedJson.Path("results.geometry.location.lng").Data().(interface{})
 	// Convert latitude and longitude to strings so they can be interpolated into weatherurl
 	// as part of the Latlong struct
-	lat_with_brackets := fmt.Sprint(latitude)
-	lat_without_left_bracket := strings.TrimPrefix(lat_with_brackets, "[")
-	lat_without_brackets := strings.TrimSuffix(lat_without_left_bracket, "]")
-	long_with_brackets := fmt.Sprint(longitude)
-	long_without_left_bracket := strings.TrimPrefix(long_with_brackets, "[")
-	long_without_brackets := strings.TrimSuffix(long_without_left_bracket, "]")
+	stringifiedLatitude := fmt.Sprint(latitude)
+	latWithoutLeftBracket := strings.TrimPrefix(stringifiedLatitude, "[")
+	latWithoutBrackets := strings.TrimSuffix(latWithoutLeftBracket, "]")
+	stringifiedLongitude := fmt.Sprint(longitude)
+	longWithoutLeftBracket := strings.TrimPrefix(stringifiedLongitude, "[")
+	longWithoutBrackets := strings.TrimSuffix(longWithoutLeftBracket, "]")
 
 	preparsed_weatherurl := "https://api.darksky.net/forecast/MY_API_KEY/{{.Latitude}},{{.Longitude}}"
 
-	substitute := Latlong{lat_without_brackets, long_without_brackets}
+	substitute := Latlong{latWithoutBrackets, longWithoutBrackets}
 	tmpl2, err2 := template.New("preparsed_weatherurl").Parse(preparsed_weatherurl)
 	// Create a variable that implements io.Writer so that I don't have to write the output to standard output
 	var parsed_weatherurl bytes.Buffer
@@ -93,36 +93,32 @@ func main() {
 		fmt.Println(err)
 	}
 
-	fmt.Println(&parsed_weatherurl)
-
 	stringified_parsed_weatherurl := fmt.Sprint(&parsed_weatherurl)
 
 	weatherClient := http.Client{
 		Timeout: time.Second * 2,
 	}
 
-	weatherreq, err := http.NewRequest(http.MethodPost, stringified_parsed_weatherurl, nil)
+	weatherreq, err := http.NewRequest(http.MethodGet, stringified_parsed_weatherurl, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	weatherreq.Header.Set("User-Agent", "hobby-weather-app")
+	weatherreq.Header.Set("User-Agent", "go-weather-app")
 
-	weatherres, getErr := weatherClient.Do(weatherreq)
-	if getErr != nil {
-		log.Fatal(getErr)
+	weatherres, errGet := weatherClient.Do(weatherreq)
+	if errGet != nil {
+		log.Fatal(errGet)
 	}
 
-	weatheroutput, readErr := ioutil.ReadAll(weatherres.Body)
-	if readErr != nil {
-		log.Fatal(readErr)
+	weatheroutput, errRead := ioutil.ReadAll(weatherres.Body)
+	if errRead != nil {
+		log.Fatal(errRead)
 	}
 
 	parsedweatherJson, err := gabs.ParseJSON([]byte(weatheroutput))
 
-	fmt.Println(parsedweatherJson)
-
-	// minutecast := parsedweatherJson.Path("minutely.summary").Data().(interface{})
-	// fmt.Println("Minutecast: ", minutecast)
+	minutecast := parsedweatherJson.Path("minutely.summary").Data() //.(interface{})
+	fmt.Println("Minutecast: ", minutecast)
 
 }
