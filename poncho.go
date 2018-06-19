@@ -15,36 +15,52 @@ import (
 	"time"
 )
 
-func main() {
+type SubValues struct {
+	Cityname  string
+	Statename string
+	Apikey    string
+}
 
-	err := godotenv.Load(".gitignore/key.txt")
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-
-	type GeocodingVars struct {
-		City   string
-		State  string
-		Apikey string
-	}
-
+func GetCity() string {
 	checkinput := bufio.NewReader(os.Stdin)
 	fmt.Println("What's the name of the city you live in?")
 	cityname, _ := checkinput.ReadString('\n')
 	cityname = strings.TrimSuffix(cityname, "\n")
+	return cityname
+}
 
+var cityname = GetCity()
+
+func GetState() string {
+	checkinput := bufio.NewReader(os.Stdin)
 	fmt.Println("And what's the 2-letter all-caps abbreviation for the state?")
 	stateabbrev, _ := checkinput.ReadString('\n')
 	stateabbrev = strings.TrimSuffix(stateabbrev, "\n")
+	return stateabbrev
+}
 
+var statename = GetState()
+
+func LoadEnvVars() {
+	err := godotenv.Load(".gitignore/key.txt")
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+}
+
+func GetApiKey() string {
+	LoadEnvVars()
 	getkey := os.Getenv("GEOLOCATION_KEY")
-	Apikey := strings.TrimSuffix(getkey, "\n")
-
+	apikey := strings.TrimSuffix(getkey, "\n")
+	return apikey
 	// msg := "Got it.  You live in {{.City}}, {{.State}}."
-	geourl := "https://maps.googleapis.com/maps/api/geocode/json?address={{.City}},+{{.State}}&key={{.Apikey}}"
+}
 
-	subin := GeocodingVars{cityname, stateabbrev, Apikey}
-	tmpl, err := template.New("geourl").Parse(geourl)
+var apikey = GetApiKey()
+
+func MakeGeolocationCall(url string) string {
+	subin := SubValues{cityname, statename, apikey}
+	tmpl, err := template.New("url").Parse(url)
 	// Create a variable that implements io.Writer so that I don't have to write the output to standard output
 	var parsedGeoUrl bytes.Buffer
 	err = tmpl.Execute(&parsedGeoUrl, subin)
@@ -54,6 +70,8 @@ func main() {
 	}
 
 	stringifiedParsedGeourl := fmt.Sprint(&parsedGeoUrl)
+	fmt.Println("Parsed geourl: ")
+	fmt.Println(&parsedGeoUrl)
 
 	latLongClient := http.Client{
 		Timeout: time.Second * 2,
@@ -75,6 +93,14 @@ func main() {
 	if readErr != nil {
 		log.Fatal(readErr)
 	}
+	return fmt.Sprint(output)
+}
+
+func main() {
+
+	preparsedGeourl := "https://maps.googleapis.com/maps/api/geocode/json?address={{.Cityname}},+{{.Statename}}&key={{.Apikey}}"
+	preparsedWeatherUrl := "https://api.darksky.net/forecast/{{.DarkskyKey}}/{{.Latitude}},{{.Longitude}}"
+	var GeoUrlResponseBody = MakeGeolocationCall(preparsedGeourl)
 
 	type Latlong struct {
 		DarkskyKey string
@@ -85,7 +111,7 @@ func main() {
 	getWeatherKey := os.Getenv("DARKSKY_KEY")
 	DarkskyKey := strings.TrimSuffix(getWeatherKey, "\n")
 
-	parsedJson, err := gabs.ParseJSON([]byte(output))
+	parsedJson, err := gabs.ParseJSON([]byte(GeoUrlResponseBody))
 
 	latitude := parsedJson.Path("results.geometry.location.lat").Data()
 	longitude := parsedJson.Path("results.geometry.location.lng").Data()
@@ -98,10 +124,8 @@ func main() {
 	longWithoutLeftBracket := strings.TrimPrefix(stringifiedLongitude, "[")
 	longWithoutBrackets := strings.TrimSuffix(longWithoutLeftBracket, "]")
 
-	preparsed_weatherurl := "https://api.darksky.net/forecast/{{.DarkskyKey}}/{{.Latitude}},{{.Longitude}}"
-
 	substitute := Latlong{DarkskyKey, latWithoutBrackets, longWithoutBrackets}
-	tmpl2, err2 := template.New("preparsed_weatherurl").Parse(preparsed_weatherurl)
+	tmpl2, err2 := template.New("preparsedWeatherUrl").Parse(preparsedWeatherUrl)
 	// Create a variable that implements io.Writer so that I don't have to write the output to standard output
 	var parsed_weatherurl bytes.Buffer
 	err = tmpl2.Execute(&parsed_weatherurl, substitute)
