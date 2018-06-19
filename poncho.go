@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-type SubValues struct {
+type GeolocationSubValues struct {
 	Cityname  string
 	Statename string
 	Apikey    string
@@ -48,7 +48,7 @@ func LoadEnvVars() {
 	}
 }
 
-func GetApiKey() string {
+func GetGeoApiKey() string {
 	LoadEnvVars()
 	getkey := os.Getenv("GEOLOCATION_KEY")
 	apikey := strings.TrimSuffix(getkey, "\n")
@@ -56,10 +56,10 @@ func GetApiKey() string {
 	// msg := "Got it.  You live in {{.City}}, {{.State}}."
 }
 
-var apikey = GetApiKey()
+var geoApiKey = GetGeoApiKey()
 
-func MakeGeolocationCall(url string) string {
-	subin := SubValues{cityname, statename, apikey}
+func MakeGeolocationCall(url string) []byte {
+	subin := GeolocationSubValues{cityname, statename, geoApiKey}
 	tmpl, err := template.New("url").Parse(url)
 	// Create a variable that implements io.Writer so that I don't have to write the output to standard output
 	var parsedGeoUrl bytes.Buffer
@@ -70,8 +70,6 @@ func MakeGeolocationCall(url string) string {
 	}
 
 	stringifiedParsedGeourl := fmt.Sprint(&parsedGeoUrl)
-	fmt.Println("Parsed geourl: ")
-	fmt.Println(&parsedGeoUrl)
 
 	latLongClient := http.Client{
 		Timeout: time.Second * 2,
@@ -93,45 +91,67 @@ func MakeGeolocationCall(url string) string {
 	if readErr != nil {
 		log.Fatal(readErr)
 	}
-	return fmt.Sprint(output)
+	return output
 }
 
-func main() {
+var preparsedGeourl = "https://maps.googleapis.com/maps/api/geocode/json?address={{.Cityname}},+{{.Statename}}&key={{.Apikey}}"
+var GeoUrlResponseBody = MakeGeolocationCall(preparsedGeourl)
+var preparsedWeatherUrl = "https://api.darksky.net/forecast/{{.DarkskyKey}}/{{.Latitude}},{{.Longitude}}"
 
-	preparsedGeourl := "https://maps.googleapis.com/maps/api/geocode/json?address={{.Cityname}},+{{.Statename}}&key={{.Apikey}}"
-	preparsedWeatherUrl := "https://api.darksky.net/forecast/{{.DarkskyKey}}/{{.Latitude}},{{.Longitude}}"
-	var GeoUrlResponseBody = MakeGeolocationCall(preparsedGeourl)
-
-	type Latlong struct {
-		DarkskyKey string
-		Latitude   string
-		Longitude  string
-	}
-
-	getWeatherKey := os.Getenv("DARKSKY_KEY")
-	DarkskyKey := strings.TrimSuffix(getWeatherKey, "\n")
-
+func GetLatitude() string {
 	parsedJson, err := gabs.ParseJSON([]byte(GeoUrlResponseBody))
-
+	if err != nil {
+		fmt.Println(err)
+	}
 	latitude := parsedJson.Path("results.geometry.location.lat").Data()
-	longitude := parsedJson.Path("results.geometry.location.lng").Data()
 	// Convert latitude and longitude to strings so they can be interpolated into weatherurl
 	// as part of the Latlong struct
 	stringifiedLatitude := fmt.Sprint(latitude)
 	latWithoutLeftBracket := strings.TrimPrefix(stringifiedLatitude, "[")
 	latWithoutBrackets := strings.TrimSuffix(latWithoutLeftBracket, "]")
+	return latWithoutBrackets
+}
+
+var latitude = GetLatitude()
+
+func GetLongitude() string {
+	parsedJson, err := gabs.ParseJSON([]byte(GeoUrlResponseBody))
+	if err != nil {
+		fmt.Println(err)
+	}
+	longitude := parsedJson.Path("results.geometry.location.lng").Data()
 	stringifiedLongitude := fmt.Sprint(longitude)
 	longWithoutLeftBracket := strings.TrimPrefix(stringifiedLongitude, "[")
 	longWithoutBrackets := strings.TrimSuffix(longWithoutLeftBracket, "]")
+	return longWithoutBrackets
+}
 
-	substitute := Latlong{DarkskyKey, latWithoutBrackets, longWithoutBrackets}
+var longitude = GetLongitude()
+
+type WeatherSubValues struct {
+	DarkskyKey string
+	Latitude   string
+	Longitude  string
+}
+
+func GetWeatherApiKey() string {
+	LoadEnvVars()
+	getWeatherKey := os.Getenv("DARKSKY_KEY")
+	darkskyKey := strings.TrimSuffix(getWeatherKey, "\n")
+	return darkskyKey
+}
+
+var weatherApiKey = GetWeatherApiKey()
+
+func MakeWeatherApiCall() {
+	substitute := WeatherSubValues{weatherApiKey, latitude, longitude}
 	tmpl2, err2 := template.New("preparsedWeatherUrl").Parse(preparsedWeatherUrl)
 	// Create a variable that implements io.Writer so that I don't have to write the output to standard output
 	var parsed_weatherurl bytes.Buffer
-	err = tmpl2.Execute(&parsed_weatherurl, substitute)
+	err2 = tmpl2.Execute(&parsed_weatherurl, substitute)
 
 	if err2 != nil {
-		fmt.Println(err)
+		fmt.Println(err2)
 	}
 
 	stringified_parsed_weatherurl := fmt.Sprint(&parsed_weatherurl)
@@ -157,10 +177,15 @@ func main() {
 		log.Fatal(errRead)
 	}
 
-	parsedweatherJson, err := gabs.ParseJSON([]byte(weatheroutput))
+	parsedWeatherJson, err := gabs.ParseJSON([]byte(weatheroutput))
+	// fmt.Println(parsedWeatherJson)
 
-	minutecast := parsedweatherJson.Path("minutely.summary").Data()
+	minutecast := parsedWeatherJson.Path("minutely.summary").Data()
 
 	fmt.Println("Minutecast: ", minutecast)
 
+}
+
+func main() {
+	MakeWeatherApiCall()
 }
