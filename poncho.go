@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/Jeffail/gabs"
+	"github.com/joho/godotenv"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -16,9 +17,15 @@ import (
 
 func main() {
 
-	type Citystate struct {
-		City  string
-		State string
+	err := godotenv.Load(".gitignore/key.txt")
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	type GeocodingVars struct {
+		City   string
+		State  string
+		Apikey string
 	}
 
 	checkinput := bufio.NewReader(os.Stdin)
@@ -28,25 +35,31 @@ func main() {
 
 	fmt.Println("And what's the 2-letter all-caps abbreviation for the state?")
 	stateabbrev, _ := checkinput.ReadString('\n')
+	stateabbrev = strings.TrimSuffix(stateabbrev, "\n")
+
+	getkey := os.Getenv("GEOLOCATION_KEY")
+	Apikey := strings.TrimSuffix(getkey, "\n")
 
 	// msg := "Got it.  You live in {{.City}}, {{.State}}."
-	geourl := "https://maps.googleapis.com/maps/api/geocode/json?address={{.City}},+{{.State}}&key=MY_API_KEY"
+	geourl := "https://maps.googleapis.com/maps/api/geocode/json?address={{.City}},+{{.State}}&key={{.Apikey}}"
 
-	subin := Citystate{cityname, stateabbrev}
+	subin := GeocodingVars{cityname, stateabbrev, Apikey}
 	tmpl, err := template.New("geourl").Parse(geourl)
 	// Create a variable that implements io.Writer so that I don't have to write the output to standard output
-	var blah bytes.Buffer
-	err = tmpl.Execute(&blah, subin)
+	var parsedGeoUrl bytes.Buffer
+	err = tmpl.Execute(&parsedGeoUrl, subin)
 
 	if err != nil {
 		fmt.Println(err)
 	}
 
+	stringifiedParsedGeourl := fmt.Sprint(&parsedGeoUrl)
+
 	latLongClient := http.Client{
 		Timeout: time.Second * 2,
 	}
 
-	req, err := http.NewRequest(http.MethodPost, geourl, nil)
+	req, err := http.NewRequest(http.MethodPost, stringifiedParsedGeourl, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -64,14 +77,18 @@ func main() {
 	}
 
 	type Latlong struct {
-		Latitude  string
-		Longitude string
+		DarkskyKey string
+		Latitude   string
+		Longitude  string
 	}
+
+	getWeatherKey := os.Getenv("DARKSKY_KEY")
+	DarkskyKey := strings.TrimSuffix(getWeatherKey, "\n")
 
 	parsedJson, err := gabs.ParseJSON([]byte(output))
 
-	latitude := parsedJson.Path("results.geometry.location.lat").Data().(interface{})
-	longitude := parsedJson.Path("results.geometry.location.lng").Data().(interface{})
+	latitude := parsedJson.Path("results.geometry.location.lat").Data()
+	longitude := parsedJson.Path("results.geometry.location.lng").Data()
 	// Convert latitude and longitude to strings so they can be interpolated into weatherurl
 	// as part of the Latlong struct
 	stringifiedLatitude := fmt.Sprint(latitude)
@@ -81,9 +98,9 @@ func main() {
 	longWithoutLeftBracket := strings.TrimPrefix(stringifiedLongitude, "[")
 	longWithoutBrackets := strings.TrimSuffix(longWithoutLeftBracket, "]")
 
-	preparsed_weatherurl := "https://api.darksky.net/forecast/MY_API_KEY/{{.Latitude}},{{.Longitude}}"
+	preparsed_weatherurl := "https://api.darksky.net/forecast/{{.DarkskyKey}}/{{.Latitude}},{{.Longitude}}"
 
-	substitute := Latlong{latWithoutBrackets, longWithoutBrackets}
+	substitute := Latlong{DarkskyKey, latWithoutBrackets, longWithoutBrackets}
 	tmpl2, err2 := template.New("preparsed_weatherurl").Parse(preparsed_weatherurl)
 	// Create a variable that implements io.Writer so that I don't have to write the output to standard output
 	var parsed_weatherurl bytes.Buffer
@@ -118,7 +135,8 @@ func main() {
 
 	parsedweatherJson, err := gabs.ParseJSON([]byte(weatheroutput))
 
-	minutecast := parsedweatherJson.Path("minutely.summary").Data() //.(interface{})
+	minutecast := parsedweatherJson.Path("minutely.summary").Data()
+
 	fmt.Println("Minutecast: ", minutecast)
 
 }
