@@ -23,7 +23,7 @@ type GeolocationSubValues struct {
 
 func GetCity() string {
 	checkinput := bufio.NewReader(os.Stdin)
-	fmt.Println("What's the name of the city you live in?")
+	fmt.Println("\nHey there! 👋 Let's get you some weather data.\n\nWhat's the name of the city you live in?")
 	cityname, _ := checkinput.ReadString('\n')
 	cityname = strings.TrimSuffix(cityname, "\n")
 	return cityname
@@ -33,13 +33,27 @@ var cityname = GetCity()
 
 func GetState() string {
 	checkinput := bufio.NewReader(os.Stdin)
-	fmt.Println("And what's the 2-letter all-caps abbreviation for the state?")
+	fmt.Println("\nAnd what's the 2-letter all-caps abbreviation for the state?")
 	stateabbrev, _ := checkinput.ReadString('\n')
 	stateabbrev = strings.TrimSuffix(stateabbrev, "\n")
+	fmt.Println("\nGot it.  Now, what kind of weather data would you like? \n")
 	return stateabbrev
 }
 
 var statename = GetState()
+
+func GetUserRequest() string {
+	checkinput := bufio.NewReader(os.Stdin)
+	fmt.Println(`Here are your choices:
+	* Text summary of the next hour's weather. --> Enter "minutely"
+	* Percent chance of precipitation in the next hour. --> Enter "hprecip"
+	* Temperature that it currently feels like. --> Enter "feelslike"`)
+	userRequest, _ := checkinput.ReadString('\n')
+	userRequest = strings.TrimSuffix(userRequest, "\n")
+	return userRequest
+}
+
+var userRequest = GetUserRequest()
 
 func LoadEnvVars() {
 	err := godotenv.Load(".gitignore/key.txt")
@@ -154,13 +168,13 @@ func MakeWeatherApiCall() {
 		fmt.Println(err2)
 	}
 
-	stringified_parsed_weatherurl := fmt.Sprint(&parsed_weatherurl)
+	stringifiedParsedWeatherUrl := fmt.Sprint(&parsed_weatherurl)
 
 	weatherClient := http.Client{
 		Timeout: time.Second * 2,
 	}
 
-	weatherreq, err := http.NewRequest(http.MethodGet, stringified_parsed_weatherurl, nil)
+	weatherreq, err := http.NewRequest(http.MethodGet, stringifiedParsedWeatherUrl, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -178,12 +192,28 @@ func MakeWeatherApiCall() {
 	}
 
 	parsedWeatherJson, err := gabs.ParseJSON([]byte(weatheroutput))
-	// fmt.Println(parsedWeatherJson)
 
 	minutecast := parsedWeatherJson.Path("minutely.summary").Data()
 
-	fmt.Println("Minutecast: ", minutecast)
+	rawHPrecipData := parsedWeatherJson.Path("hourly.data.0.precipProbability").Data()
+	if rawHPrecipData == nil {
+		rawHPrecipData = 0
+	}
+	precipInNextHour := rawHPrecipData.(int) * 100
 
+	feelsLike := parsedWeatherJson.Path("currently.apparentTemperature").Data()
+	feelsLike = fmt.Sprint(feelsLike)
+
+	switch userRequest {
+	case "minutely":
+		fmt.Println("\nMinutecast: ", minutecast)
+	case "hprecip":
+		fmt.Println("\nChance of precipitation in next hour: ", precipInNextHour, "%")
+	case "feelslike":
+		fmt.Println("\nIt feels like it's", feelsLike, "°F")
+	default:
+		fmt.Println("Sorry, I didn't quite catch that.")
+	}
 }
 
 func main() {
