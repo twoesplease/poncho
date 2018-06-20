@@ -1,6 +1,7 @@
 package main
 
 import (
+	"./checkfinished"
 	"bufio"
 	"bytes"
 	"fmt"
@@ -36,7 +37,7 @@ func GetState() string {
 	fmt.Println("\nAnd what's the 2-letter all-caps abbreviation for the state?")
 	stateabbrev, _ := checkinput.ReadString('\n')
 	stateabbrev = strings.TrimSuffix(stateabbrev, "\n")
-	fmt.Println("\nGot it.  Now, what kind of weather data would you like? \n")
+	fmt.Println("\nGot it.  Now, what kind of weather data would you like?")
 	return stateabbrev
 }
 
@@ -47,7 +48,8 @@ func GetUserRequest() string {
 	fmt.Println(`Here are your choices:
 	* Text summary of the next hour's weather. --> Enter "minutely"
 	* Percent chance of precipitation in the next hour. --> Enter "hprecip"
-	* Temperature that it currently feels like. --> Enter "feelslike"`)
+	* Temperature that it currently feels like. --> Enter "feelslike"
+	* Exit without getting weather data. --> Enter "exit"`)
 	userRequest, _ := checkinput.ReadString('\n')
 	userRequest = strings.TrimSuffix(userRequest, "\n")
 	return userRequest
@@ -67,7 +69,6 @@ func GetGeoApiKey() string {
 	getkey := os.Getenv("GEOLOCATION_KEY")
 	apikey := strings.TrimSuffix(getkey, "\n")
 	return apikey
-	// msg := "Got it.  You live in {{.City}}, {{.State}}."
 }
 
 var geoApiKey = GetGeoApiKey()
@@ -211,9 +212,27 @@ func MakeWeatherApiCall() {
 		fmt.Println("\nChance of precipitation in next hour: ", precipInNextHour, "%")
 	case "feelslike":
 		fmt.Println("\nIt feels like it's", feelsLike, "°F")
+	case "exit":
+		fmt.Println("\nOk, bye! 🤙")
+		os.Exit(0)
 	default:
 		fmt.Println("Sorry, I didn't quite catch that.")
+		GetUserRequest()
 	}
+
+	var stayOrExit = checkfinished.IsUserDone()
+
+	switch stayOrExit {
+	case "more please":
+		GetUserRequest()
+	case "exit":
+		fmt.Println("\nOk, bye! 🤙")
+		os.Exit(0)
+	default:
+		fmt.Println("\nSorry, didn't quite get that.  Can you try again?")
+		checkfinished.IsUserDone()
+	}
+
 }
 
 func main() {
