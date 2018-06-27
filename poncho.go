@@ -16,46 +16,31 @@ import (
 	"time"
 )
 
-type GeolocationSubValues struct {
-	Cityname  string
-	Statename string
-	Apikey    string
-}
+// func Greeting() {
+// fmt.Println("\nHey there! 👋 Let's get you some weather data.")
+// }
 
 func GetCity() string {
 	checkinput := bufio.NewReader(os.Stdin)
-	fmt.Println("\nHey there! 👋 Let's get you some weather data.\n\nWhat's the name of the city you live in?")
+	fmt.Println("\nHey there! 👋 Let's get you some weather data.\nWhat's the name of the city you live in?")
 	cityname, _ := checkinput.ReadString('\n')
 	cityname = strings.TrimSuffix(cityname, "\n")
+	fmt.Println("City name: ", cityname)
 	return cityname
 }
 
-var cityname = GetCity()
+// var cityname = GetCity()
 
 func GetState() string {
 	checkinput := bufio.NewReader(os.Stdin)
 	fmt.Println("\nAnd what's the 2-letter all-caps abbreviation for the state?")
 	stateabbrev, _ := checkinput.ReadString('\n')
 	stateabbrev = strings.TrimSuffix(stateabbrev, "\n")
-	fmt.Println("\nGot it.  Now, what kind of weather data would you like?")
+	fmt.Println("State name: ", stateabbrev)
 	return stateabbrev
 }
 
-var statename = GetState()
-
-func GetUserRequest() string {
-	checkinput := bufio.NewReader(os.Stdin)
-	fmt.Println(`Here are your choices:
-	* Text summary of the next hour's weather. --> Enter "minutely"
-	* Percent chance of precipitation in the next hour. --> Enter "hprecip"
-	* Temperature that it currently feels like. --> Enter "feelslike"
-	* Exit without getting weather data. --> Enter "exit"`)
-	userRequest, _ := checkinput.ReadString('\n')
-	userRequest = strings.TrimSuffix(userRequest, "\n")
-	return userRequest
-}
-
-var userRequest = GetUserRequest()
+// var statename = GetState()
 
 func LoadEnvVars() {
 	err := godotenv.Load(".gitignore/key.txt")
@@ -74,7 +59,7 @@ func GetGeoApiKey() string {
 var geoApiKey = GetGeoApiKey()
 
 func MakeGeolocationCall(url string) []byte {
-	subin := GeolocationSubValues{cityname, statename, geoApiKey}
+	subin := GeolocationSubValues{GetCity(), GetState(), geoApiKey}
 	tmpl, err := template.New("url").Parse(url)
 	// Create a variable that implements io.Writer so that I don't have to write the output to standard output
 	var parsedGeoUrl bytes.Buffer
@@ -97,57 +82,99 @@ func MakeGeolocationCall(url string) []byte {
 
 	req.Header.Set("User-Agent", "hobby-weather-app")
 
-	res, getErr := latLongClient.Do(req)
+	Res, getErr := latLongClient.Do(req)
 	if getErr != nil {
 		log.Fatal(getErr)
 	}
 
-	output, readErr := ioutil.ReadAll(res.Body)
-	if readErr != nil {
-		log.Fatal(readErr)
+	body, err := ioutil.ReadAll(Res.Body)
+	stringifiedBody := string(body)
+	emptyResponse := strings.Contains(stringifiedBody, "ZERO_RESULTS")
+	switch emptyResponse {
+	case true:
+		fmt.Println("Hmm, it seems that's not a valid location.  Let's try again.")
+		// cityname = ""
+		// statename = ""
+		RetryGeo()
+		break
+	case false:
+		Output, readErr := ioutil.ReadAll(Res.Body)
+		if readErr != nil {
+			log.Fatal(readErr)
+		}
+		fmt.Println("Geo Response code: ", Res.StatusCode)
+		return Output
 	}
-	return output
+	return nil
 }
 
-var preparsedGeourl = "https://maps.googleapis.com/maps/api/geocode/json?address={{.Cityname}},+{{.Statename}}&key={{.Apikey}}"
-var GeoUrlResponseBody = MakeGeolocationCall(preparsedGeourl)
-var preparsedWeatherUrl = "https://api.darksky.net/forecast/{{.DarkskyKey}}/{{.Latitude}},{{.Longitude}}"
+func RetryGeo() {
+	// GetCity()
+	// GetState()
+	MakeGeolocationCall(preparsedGeoUrl)
+}
 
-func GetLatitude() string {
+type GeolocationSubValues struct {
+	Cityname  string
+	Statename string
+	Apikey    string
+}
+
+var preparsedGeoUrl = "https://maps.googleapis.com/maps/api/geocode/json?address={{.Cityname}},+{{.Statename}}&key={{.Apikey}}"
+var preparsedWeatherUrl = "https://api.darksky.net/forecast/{{.DarkskyKey}}/{{.Latitude}},{{.Longitude}}"
+var GeoUrlResponseBody = MakeGeolocationCall(preparsedGeoUrl)
+
+func GetLatitude() (latitude string) {
 	parsedJson, err := gabs.ParseJSON([]byte(GeoUrlResponseBody))
 	if err != nil {
+		fmt.Print("Getlat json parse error: ")
 		fmt.Println(err)
 	}
-	latitude := parsedJson.Path("results.geometry.location.lat").Data()
+	lat := parsedJson.Path("results.geometry.location.lat").Data()
 	// Convert latitude and longitude to strings so they can be interpolated into weatherurl
 	// as part of the Latlong struct
-	stringifiedLatitude := fmt.Sprint(latitude)
+	stringifiedLatitude := fmt.Sprint(lat)
 	latWithoutLeftBracket := strings.TrimPrefix(stringifiedLatitude, "[")
 	latWithoutBrackets := strings.TrimSuffix(latWithoutLeftBracket, "]")
+	fmt.Println("Latitude: ", latWithoutBrackets)
 	return latWithoutBrackets
 }
 
-var latitude = GetLatitude()
+// var latitude = GetLatitude()
 
-func GetLongitude() string {
+func GetLongitude() (longitude string) {
 	parsedJson, err := gabs.ParseJSON([]byte(GeoUrlResponseBody))
 	if err != nil {
+		fmt.Print("Getlong JSON parse error: ")
 		fmt.Println(err)
 	}
-	longitude := parsedJson.Path("results.geometry.location.lng").Data()
-	stringifiedLongitude := fmt.Sprint(longitude)
+	long := parsedJson.Path("results.geometry.location.lng").Data()
+	stringifiedLongitude := fmt.Sprint(long)
 	longWithoutLeftBracket := strings.TrimPrefix(stringifiedLongitude, "[")
 	longWithoutBrackets := strings.TrimSuffix(longWithoutLeftBracket, "]")
+	fmt.Println("Longitude: ", longWithoutBrackets)
 	return longWithoutBrackets
 }
 
-var longitude = GetLongitude()
+// var longitude = GetLongitude()
 
-type WeatherSubValues struct {
-	DarkskyKey string
-	Latitude   string
-	Longitude  string
+func introduceWeatherRequest() {
+	fmt.Println("\nGot it.  Now, what kind of weather data would you like?")
 }
+
+func GetUserRequest() string {
+	checkinput := bufio.NewReader(os.Stdin)
+	fmt.Println(`Here are your choices:
+	* Text summary of the next hour's weather. --> Enter "minutely"
+	* Percent chance of precipitation in the next hour. --> Enter "hprecip"
+	* Temperature that it currently feels like. --> Enter "feelslike"
+	* Exit without getting weather data. --> Enter "exit"`)
+	userRequest, _ := checkinput.ReadString('\n')
+	userRequest = strings.TrimSuffix(userRequest, "\n")
+	return userRequest
+}
+
+var userRequest = GetUserRequest()
 
 func GetWeatherApiKey() string {
 	LoadEnvVars()
@@ -158,8 +185,14 @@ func GetWeatherApiKey() string {
 
 var weatherApiKey = GetWeatherApiKey()
 
+type WeatherSubValues struct {
+	DarkskyKey string
+	Latitude   string
+	Longitude  string
+}
+
 func MakeWeatherApiCall() {
-	substitute := WeatherSubValues{weatherApiKey, latitude, longitude}
+	substitute := WeatherSubValues{weatherApiKey, GetLatitude(), GetLongitude()}
 	tmpl2, err2 := template.New("preparsedWeatherUrl").Parse(preparsedWeatherUrl)
 	// Create a variable that implements io.Writer so that I don't have to write the output to standard output
 	var parsed_weatherurl bytes.Buffer
@@ -170,6 +203,7 @@ func MakeWeatherApiCall() {
 	}
 
 	stringifiedParsedWeatherUrl := fmt.Sprint(&parsed_weatherurl)
+	fmt.Println("Parsed weather URL: ", stringifiedParsedWeatherUrl)
 
 	weatherClient := http.Client{
 		Timeout: time.Second * 2,
@@ -185,6 +219,21 @@ func MakeWeatherApiCall() {
 	weatherres, errGet := weatherClient.Do(weatherreq)
 	if errGet != nil {
 		log.Fatal(errGet)
+	}
+	fmt.Println("Status code: ", weatherres.StatusCode)
+	if weatherres.StatusCode != 200 {
+		fmt.Println("Oops, that request didn't work.  Let's try again.")
+		// cityname = ""
+		// statename = ""
+		// latitude = ""
+		// longitude = ""
+		// parsed_weatherurl.Reset()
+		// stringifiedParsedWeatherUrl = ""
+		// tmpl2 = {{""}}
+		// err2 = nil
+		// weatherreq = nil
+		// weatherres = nil
+		RetryWeatherCall()
 	}
 
 	weatheroutput, errRead := ioutil.ReadAll(weatherres.Body)
@@ -207,7 +256,11 @@ func MakeWeatherApiCall() {
 
 	switch userRequest {
 	case "minutely":
-		fmt.Println("\nMinutecast: ", minutecast)
+		if minutecast != nil {
+			fmt.Println("\nMinutecast: ", minutecast)
+		} else {
+			fmt.Println("Darn!  I couldn't get that data.")
+		}
 	case "hprecip":
 		fmt.Println("\nChance of precipitation in next hour: ", precipInNextHour, "%")
 	case "feelslike":
@@ -225,6 +278,7 @@ func MakeWeatherApiCall() {
 	switch stayOrExit {
 	case "more please":
 		GetUserRequest()
+		MakeWeatherApiCall()
 	case "exit":
 		fmt.Println("\nOk, bye! 🤙")
 		os.Exit(0)
@@ -235,6 +289,27 @@ func MakeWeatherApiCall() {
 
 }
 
+func RetryWeatherCall() {
+	// cityname = ""
+	// statename = ""
+	// GeoUrlResponseBody = nil
+	// latitude = ""
+	// longitude = ""
+	// userRequest = ""
+	// Greeting()
+
+	//*** Adding GetCity() & GetState() function calls below prevent this from an infinite loop
+	// when nil latitude and longitude data are returned ***//
+	GetCity()
+	GetState()
+
+	MakeWeatherApiCall()
+}
+
 func main() {
+	// Greeting()
+	// GetCity()
+	// GetState()
+	// // MakeGeolocationCall(preparsedGeoUrl)
 	MakeWeatherApiCall()
 }
