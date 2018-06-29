@@ -87,31 +87,37 @@ func MakeGeolocationCall(url string) []byte {
 		log.Fatal(getErr)
 	}
 
-	body, err := ioutil.ReadAll(Res.Body)
-	stringifiedBody := string(body)
-	emptyResponse := strings.Contains(stringifiedBody, "ZERO_RESULTS")
-	switch emptyResponse {
-	case true:
-		fmt.Println("Hmm, it seems that's not a valid location.  Let's try again.")
-		// cityname = ""
-		// statename = ""
-		RetryGeo()
-		break
-	case false:
-		Output, readErr := ioutil.ReadAll(Res.Body)
-		if readErr != nil {
-			log.Fatal(readErr)
-		}
-		fmt.Println("Geo Response code: ", Res.StatusCode)
-		return Output
+	Output, readErr := ioutil.ReadAll(Res.Body)
+	stringifiedBody := string(Output)
+	if strings.Contains(stringifiedBody, "ZERO_RESULTS") {
+		return []byte("Hmm, it seems that's not a valid location.  Let's try again.")
 	}
-	return nil
+
+	if readErr != nil {
+		log.Fatal(readErr)
+		fmt.Println("Geo Response code: ", Res.StatusCode)
+	}
+	return Output
 }
 
-func RetryGeo() {
-	// GetCity()
-	// GetState()
-	MakeGeolocationCall(preparsedGeoUrl)
+// This still doesn't work gosh darn it
+func TryGeo(numberOfTries int, sleep time.Duration, fn interface{}) ([]byte, error) {
+	if err := fn; err != nil {
+		if s, ok := err.(stop); ok {
+			return nil, s.error
+		}
+
+		if numberOfTries--; numberOfTries > 0 {
+			time.Sleep(sleep)
+			return TryGeo(numberOfTries, 2*sleep, fn)
+		}
+		return err.([]byte), nil
+	}
+	return nil, nil
+}
+
+type stop struct {
+	error
 }
 
 type GeolocationSubValues struct {
@@ -122,7 +128,9 @@ type GeolocationSubValues struct {
 
 var preparsedGeoUrl = "https://maps.googleapis.com/maps/api/geocode/json?address={{.Cityname}},+{{.Statename}}&key={{.Apikey}}"
 var preparsedWeatherUrl = "https://api.darksky.net/forecast/{{.DarkskyKey}}/{{.Latitude}},{{.Longitude}}"
-var GeoUrlResponseBody = MakeGeolocationCall(preparsedGeoUrl)
+var GeoUrlResponseBody, _ = TryGeo(3, 2, MakeGeolocationCall(preparsedGeoUrl))
+
+// var GeoUrlResponseBody, _ = MakeGeolocationCall(preparsedGeoUrl)
 
 func GetLatitude() (latitude string) {
 	parsedJson, err := gabs.ParseJSON([]byte(GeoUrlResponseBody))
