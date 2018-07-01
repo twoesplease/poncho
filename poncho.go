@@ -18,16 +18,15 @@ import (
 	"time"
 )
 
-// func Greeting() {
-// fmt.Println("\nHey there! 👋 Let's get you some weather data.")
-// }
+func Greeting() {
+	fmt.Println("\nHey there! 👋 Let's get you some weather data.")
+}
 
 func GetCity() string {
 	checkinput := bufio.NewReader(os.Stdin)
-	fmt.Println("\nHey there! 👋 Let's get you some weather data.\nWhat's the name of the city you live in?")
+	fmt.Println("What's the name of the city you live in?")
 	cityname, _ := checkinput.ReadString('\n')
 	cityname = strings.TrimSuffix(cityname, "\n")
-	fmt.Println("City name: ", cityname)
 	return cityname
 }
 
@@ -38,7 +37,6 @@ func GetState() string {
 	fmt.Println("\nAnd what's the 2-letter all-caps abbreviation for the state?")
 	stateabbrev, _ := checkinput.ReadString('\n')
 	stateabbrev = strings.TrimSuffix(stateabbrev, "\n")
-	fmt.Println("State name: ", stateabbrev)
 	return stateabbrev
 }
 
@@ -145,7 +143,6 @@ func GetLatitude() (latitude string) {
 	stringifiedLatitude := fmt.Sprint(lat)
 	latWithoutLeftBracket := strings.TrimPrefix(stringifiedLatitude, "[")
 	latWithoutBrackets := strings.TrimSuffix(latWithoutLeftBracket, "]")
-	fmt.Println("Latitude: ", latWithoutBrackets)
 	return latWithoutBrackets
 }
 
@@ -161,7 +158,6 @@ func GetLongitude() (longitude string) {
 	stringifiedLongitude := fmt.Sprint(long)
 	longWithoutLeftBracket := strings.TrimPrefix(stringifiedLongitude, "[")
 	longWithoutBrackets := strings.TrimSuffix(longWithoutLeftBracket, "]")
-	fmt.Println("Longitude: ", longWithoutBrackets)
 	return longWithoutBrackets
 }
 
@@ -171,6 +167,8 @@ func introduceWeatherRequest() {
 	fmt.Println("\nGot it.  Now, what kind of weather data would you like?")
 }
 
+var userRequest string
+
 func GetUserRequest() string {
 	checkinput := bufio.NewReader(os.Stdin)
 	fmt.Println(`Here are your choices:
@@ -178,12 +176,13 @@ func GetUserRequest() string {
 	* Percent chance of precipitation in the next hour. --> Enter "hprecip"
 	* Temperature that it currently feels like. --> Enter "feelslike"
 	* Exit without getting weather data. --> Enter "exit"`)
-	userRequest, _ := checkinput.ReadString('\n')
-	userRequest = strings.TrimSuffix(userRequest, "\n")
-	return userRequest
+	request, _ := checkinput.ReadString('\n')
+	request = strings.TrimSuffix(request, "\n")
+	userRequest = request
+	return request
 }
 
-var userRequest = GetUserRequest()
+// var userRequest = GetUserRequest()
 
 func GetWeatherApiKey() string {
 	LoadEnvVars()
@@ -212,7 +211,6 @@ func MakeWeatherApiCall() {
 	}
 
 	stringifiedParsedWeatherUrl := fmt.Sprint(&parsed_weatherurl)
-	fmt.Println("Parsed weather URL: ", stringifiedParsedWeatherUrl)
 
 	weatherClient := http.Client{
 		Timeout: time.Second * 2,
@@ -263,6 +261,7 @@ func MakeWeatherApiCall() {
 	feelsLike := parsedWeatherJson.Path("currently.apparentTemperature").Data()
 	feelsLike = fmt.Sprint(feelsLike)
 
+	GetUserRequest()
 	switch userRequest {
 	case "minutely":
 		if minutecast != nil {
@@ -316,7 +315,7 @@ func retryWeatherCall() {
 }
 
 func main() {
-	// Greeting()
+	Greeting()
 	// GetCity()
 	// GetState()
 	// MakeGeolocationCall(preparsedGeoUrl)
