@@ -4,6 +4,7 @@ import (
 	"./checkfinished"
 	"bufio"
 	"bytes"
+	// "errors"
 	"fmt"
 	"github.com/Jeffail/gabs"
 	"github.com/joho/godotenv"
@@ -66,7 +67,7 @@ func MakeGeolocationCall(url string) []byte {
 	err = tmpl.Execute(&parsedGeoUrl, subin)
 
 	if err != nil {
-		fmt.Println(err)
+		log.Fatal(err)
 	}
 
 	stringifiedParsedGeourl := fmt.Sprint(&parsedGeoUrl)
@@ -75,9 +76,9 @@ func MakeGeolocationCall(url string) []byte {
 		Timeout: time.Second * 2,
 	}
 
-	req, err := http.NewRequest(http.MethodPost, stringifiedParsedGeourl, nil)
-	if err != nil {
-		log.Fatal(err)
+	req, reqErr := http.NewRequest(http.MethodPost, stringifiedParsedGeourl, nil)
+	if reqErr != nil {
+		log.Fatal(reqErr)
 	}
 
 	req.Header.Set("User-Agent", "hobby-weather-app")
@@ -90,7 +91,8 @@ func MakeGeolocationCall(url string) []byte {
 	Output, readErr := ioutil.ReadAll(Res.Body)
 	stringifiedBody := string(Output)
 	if strings.Contains(stringifiedBody, "ZERO_RESULTS") {
-		return []byte("Hmm, it seems that's not a valid location.  Let's try again.")
+		// fmt.Println("Hmm, it seems that's not a valid location.  Let's try again.")
+		return []byte("hmm, it seems that's not a valid location.Let's try again.")
 	}
 
 	if readErr != nil {
@@ -101,19 +103,20 @@ func MakeGeolocationCall(url string) []byte {
 }
 
 // This still doesn't work gosh darn it
-func TryGeo(numberOfTries int, sleep time.Duration, fn interface{}) ([]byte, error) {
+func TryGeo(numberOfTries int, sleep time.Duration, fn interface{}) []byte {
 	if err := fn; err != nil {
 		if s, ok := err.(stop); ok {
-			return nil, s.error
+			sprintErr := fmt.Sprint(s.error)
+			return []byte(sprintErr)
 		}
 
 		if numberOfTries--; numberOfTries > 0 {
 			time.Sleep(sleep)
 			return TryGeo(numberOfTries, 2*sleep, fn)
 		}
-		return err.([]byte), nil
+		return err.([]byte)
 	}
-	return nil, nil
+	return nil
 }
 
 type stop struct {
@@ -128,7 +131,7 @@ type GeolocationSubValues struct {
 
 var preparsedGeoUrl = "https://maps.googleapis.com/maps/api/geocode/json?address={{.Cityname}},+{{.Statename}}&key={{.Apikey}}"
 var preparsedWeatherUrl = "https://api.darksky.net/forecast/{{.DarkskyKey}}/{{.Latitude}},{{.Longitude}}"
-var GeoUrlResponseBody, _ = TryGeo(3, 2, MakeGeolocationCall(preparsedGeoUrl))
+var GeoUrlResponseBody = TryGeo(3, 2, MakeGeolocationCall(preparsedGeoUrl))
 
 // var GeoUrlResponseBody, _ = MakeGeolocationCall(preparsedGeoUrl)
 
@@ -241,7 +244,7 @@ func MakeWeatherApiCall() {
 		// err2 = nil
 		// weatherreq = nil
 		// weatherres = nil
-		RetryWeatherCall()
+		retryWeatherCall()
 	}
 
 	weatheroutput, errRead := ioutil.ReadAll(weatherres.Body)
@@ -297,7 +300,7 @@ func MakeWeatherApiCall() {
 
 }
 
-func RetryWeatherCall() {
+func retryWeatherCall() {
 	// cityname = ""
 	// statename = ""
 	// GeoUrlResponseBody = nil
