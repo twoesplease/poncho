@@ -4,10 +4,11 @@ import (
 	"./checkfinished"
 	"bufio"
 	"bytes"
-	// "errors"
+	"errors"
 	"fmt"
 	"github.com/Jeffail/gabs"
 	"github.com/joho/godotenv"
+	"github.com/matryer/try"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -59,7 +60,9 @@ func GetGeoApiKey() string {
 
 var geoApiKey = GetGeoApiKey()
 
-func MakeGeolocationCall(url string) []byte {
+var GeoURLResponseBody []byte
+
+func MakeGeolocationCall(url string) ([]byte, error) {
 	subin := GeolocationSubValues{GetCity(), GetState(), geoApiKey}
 	tmpl, err := template.New("url").Parse(url)
 	// Create a variable that implements io.Writer so that I don't have to write the output to standard output
@@ -92,36 +95,36 @@ func MakeGeolocationCall(url string) []byte {
 	stringifiedBody := string(Output)
 	if strings.Contains(stringifiedBody, "ZERO_RESULTS") {
 		// fmt.Println("Hmm, it seems that's not a valid location.  Let's try again.")
-		return []byte("hmm, it seems that's not a valid location.Let's try again.")
+		return nil, errors.New("Hmm, it seems that's not a valid location.Let's try again.")
 	}
 
 	if readErr != nil {
 		log.Fatal(readErr)
 		fmt.Println("Geo Response code: ", Res.StatusCode)
 	}
-	return Output
+	GeoURLResponseBody = Output
+	return Output, nil
 }
 
-// This still doesn't work gosh darn it
-func TryGeo(numberOfTries int, sleep time.Duration, fn interface{}) []byte {
-	if err := fn; err != nil {
-		if s, ok := err.(stop); ok {
-			sprintErr := fmt.Sprint(s.error)
-			return []byte(sprintErr)
-		}
+var value []byte
 
-		if numberOfTries--; numberOfTries > 0 {
-			time.Sleep(sleep)
-			return TryGeo(numberOfTries, 2*sleep, fn)
+func geoCallRepeater() {
+	err := try.Do(func(attempt int) (bool, error) {
+		var err error
+		value, err = MakeGeolocationCall(preparsedGeoUrl)
+		if err != nil {
+			fmt.Println("Hmm, it seems that's not a valid location.  Let's try again.")
+			time.Sleep(2 * time.Second) // wait 2 seconds before retrying
 		}
-		return err.([]byte)
+		return attempt < 3, err // try 3 times
+	})
+	if err != nil {
+		log.Fatalln("error: ", err)
 	}
-	return nil
 }
 
-type stop struct {
-	error
-}
+var preparsedGeoUrl = "https://maps.googleapis.com/maps/api/geocode/json?address={{.Cityname}},+{{.Statename}}&key={{.Apikey}}"
+var preparsedWeatherUrl = "https://api.darksky.net/forecast/{{.DarkskyKey}}/{{.Latitude}},{{.Longitude}}"
 
 type GeolocationSubValues struct {
 	Cityname  string
@@ -129,14 +132,9 @@ type GeolocationSubValues struct {
 	Apikey    string
 }
 
-var preparsedGeoUrl = "https://maps.googleapis.com/maps/api/geocode/json?address={{.Cityname}},+{{.Statename}}&key={{.Apikey}}"
-var preparsedWeatherUrl = "https://api.darksky.net/forecast/{{.DarkskyKey}}/{{.Latitude}},{{.Longitude}}"
-var GeoUrlResponseBody = TryGeo(3, 2, MakeGeolocationCall(preparsedGeoUrl))
-
-// var GeoUrlResponseBody, _ = MakeGeolocationCall(preparsedGeoUrl)
-
 func GetLatitude() (latitude string) {
-	parsedJson, err := gabs.ParseJSON([]byte(GeoUrlResponseBody))
+	geoCallRepeater()
+	parsedJson, err := gabs.ParseJSON([]byte(GeoURLResponseBody))
 	if err != nil {
 		fmt.Print("Getlat json parse error: ")
 		fmt.Println(err)
@@ -154,7 +152,7 @@ func GetLatitude() (latitude string) {
 // var latitude = GetLatitude()
 
 func GetLongitude() (longitude string) {
-	parsedJson, err := gabs.ParseJSON([]byte(GeoUrlResponseBody))
+	parsedJson, err := gabs.ParseJSON([]byte(GeoURLResponseBody))
 	if err != nil {
 		fmt.Print("Getlong JSON parse error: ")
 		fmt.Println(err)
@@ -303,7 +301,7 @@ func MakeWeatherApiCall() {
 func retryWeatherCall() {
 	// cityname = ""
 	// statename = ""
-	// GeoUrlResponseBody = nil
+	// GeoURLResponseBody = nil
 	// latitude = ""
 	// longitude = ""
 	// userRequest = ""
@@ -321,6 +319,6 @@ func main() {
 	// Greeting()
 	// GetCity()
 	// GetState()
-	// // MakeGeolocationCall(preparsedGeoUrl)
+	// MakeGeolocationCall(preparsedGeoUrl)
 	MakeWeatherApiCall()
 }
