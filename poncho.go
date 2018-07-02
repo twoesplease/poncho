@@ -7,8 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Jeffail/gabs"
-	"github.com/fatih/color"
 	"github.com/joho/godotenv"
+	. "github.com/logrusorgru/aurora"
 	"github.com/matryer/try"
 	"io/ioutil"
 	"log"
@@ -20,12 +20,12 @@ import (
 )
 
 func Greeting() {
-	color.Cyan("\nHey there! 👋 Let's get you some weather data.")
+	fmt.Println(Cyan("\nHey there! 👋 Let's get you some weather data."))
 }
 
 func GetCity() string {
 	checkinput := bufio.NewReader(os.Stdin)
-	color.Cyan("What's the name of the city you live in?")
+	fmt.Println(Cyan("What's the name of the city you live in?"))
 	cityname, _ := checkinput.ReadString('\n')
 	cityname = strings.TrimSuffix(cityname, "\n")
 	return cityname
@@ -33,7 +33,7 @@ func GetCity() string {
 
 func GetState() string {
 	checkinput := bufio.NewReader(os.Stdin)
-	color.Cyan("\nAnd what's the 2-letter all-caps abbreviation for the state?")
+	fmt.Println(Cyan("\nAnd what's the 2-letter all-caps abbreviation for the state?"))
 	stateabbrev, _ := checkinput.ReadString('\n')
 	stateabbrev = strings.TrimSuffix(stateabbrev, "\n")
 	return stateabbrev
@@ -106,7 +106,7 @@ func geoCallRepeater() {
 		var err error
 		value, err = MakeGeolocationCall(preparsedGeoUrl)
 		if err != nil {
-			color.Red("Hmm, it seems that's not a valid location.  Let's try again.")
+			fmt.Println(Red("Hmm, it seems that's not a valid location.  Let's try again."))
 			time.Sleep(2 * time.Second) // wait 2 seconds before retrying
 		}
 		return attempt < 3, err // try 3 times
@@ -150,22 +150,18 @@ func GetLongitude() (longitude string) {
 	return longWithoutBrackets
 }
 
-func introduceWeatherRequest() {
-	color.Cyan("\nGot it.  Now, what kind of weather data would you like?")
-}
-
 var userRequest string
 
 func GetUserRequest() string {
 	checkinput := bufio.NewReader(os.Stdin)
-	color.Cyan(`Here are your choices:
+	fmt.Println(Cyan(`Here are your choices:
 	* Text summary of the next hour's weather. --> Enter "minutely"
 	* Percent chance of precipitation in the next hour. --> Enter "hprecip"
 	* Temperature that it currently feels like. --> Enter "feelslike"
 	* Current humidity level. --> Enter "humidity"
 	* Current wind speed. --> Enter "windspeed"
 	* Current visibility in miles. --> Enter "visibility"
-	* Exit without getting weather data. --> Enter "exit"`)
+	* Exit without getting weather data. --> Enter "exit"`))
 	request, _ := checkinput.ReadString('\n')
 	request = strings.TrimSuffix(request, "\n")
 	userRequest = request
@@ -218,7 +214,7 @@ func MakeWeatherApiCall() {
 		log.Fatal(errGet)
 	}
 	if weatherres.StatusCode != 200 {
-		color.Red("Oops, that request didn't work.  Let's try again.")
+		fmt.Println(Red("Oops, that request didn't work.  Let's try again."))
 		retryWeatherCall()
 	}
 
@@ -260,26 +256,27 @@ func userRequestSwitch() {
 	switch userRequest {
 	case "minutely":
 		if minutecast != nil {
-			color.Cyan("\nMinutecast: ", minutecast)
+			fmt.Println(Green("\nMinutecast: "), Green(minutecast))
 		} else {
-			color.Red("Darn!  I couldn't get that data.")
+			fmt.Println(Red("Darn!  I couldn't get that data."))
 		}
 	case "hprecip":
-		color.Cyan("\nChance of precipitation in next hour: ", precipInNextHour, "%.")
+		fmt.Println(Green("\nChance of precipitation in next hour: "), Green(precipInNextHour), Green("%."))
 	case "feelslike":
-		color.Cyan("\nIt feels like it's", feelsLike, "°F.")
+		fmt.Println(Green("\nIt feels like it's"), Green(feelsLike), Green("°F."))
 	case "humidity":
-		color.Cyan("\nRight now the humidity's at", humidityPercent, "%.")
+		fmt.Println(Green("\nRight now the humidity's at"), Green(humidityPercent), Green("%."))
 	case "windspeed":
-		color.Cyan("\nThe wind's blowing", windSpeed, "miles per hour.")
+		fmt.Println(Green("\nThe wind's blowing"), Green(windSpeed), Green("miles per hour."))
 	case "visibility":
-		color.Cyan("\nRight now you can see about", visibility, "miles.")
+		fmt.Println(Green("\nRight now you can see about"), Green(visibility), Green("miles."))
 	case "exit":
-		color.Cyan("\nOk, bye! 🤙")
+		fmt.Println(Green("\nOk, bye! 🤙"))
 		os.Exit(0)
 	default:
-		color.Red("Sorry, I didn't quite catch that.")
+		fmt.Println(Red("Sorry, I didn't quite catch that."))
 		GetUserRequest()
+		userRequestSwitch()
 	}
 
 }
@@ -293,10 +290,10 @@ func stayOrExitSwitch() {
 		userRequestSwitch()
 		stayOrExitSwitch()
 	case "exit":
-		color.Cyan("\nOk, bye! 🤙")
+		fmt.Println(Cyan("\nOk, bye! 🤙"))
 		os.Exit(0)
 	default:
-		color.Red("\nSorry, didn't quite get that.  Can you try again?")
+		fmt.Println(Red("\nSorry, didn't quite get that.  Can you try again?"))
 		stayOrExitSwitch()
 	}
 }
