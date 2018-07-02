@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Jeffail/gabs"
+	"github.com/fatih/color"
 	"github.com/joho/godotenv"
 	"github.com/matryer/try"
 	"io/ioutil"
@@ -19,12 +20,12 @@ import (
 )
 
 func Greeting() {
-	fmt.Println("\nHey there! 👋 Let's get you some weather data.")
+	color.Cyan("\nHey there! 👋 Let's get you some weather data.")
 }
 
 func GetCity() string {
 	checkinput := bufio.NewReader(os.Stdin)
-	fmt.Println("What's the name of the city you live in?")
+	color.Cyan("What's the name of the city you live in?")
 	cityname, _ := checkinput.ReadString('\n')
 	cityname = strings.TrimSuffix(cityname, "\n")
 	return cityname
@@ -32,7 +33,7 @@ func GetCity() string {
 
 func GetState() string {
 	checkinput := bufio.NewReader(os.Stdin)
-	fmt.Println("\nAnd what's the 2-letter all-caps abbreviation for the state?")
+	color.Cyan("\nAnd what's the 2-letter all-caps abbreviation for the state?")
 	stateabbrev, _ := checkinput.ReadString('\n')
 	stateabbrev = strings.TrimSuffix(stateabbrev, "\n")
 	return stateabbrev
@@ -88,7 +89,6 @@ func MakeGeolocationCall(url string) ([]byte, error) {
 	Output, readErr := ioutil.ReadAll(Res.Body)
 	stringifiedBody := string(Output)
 	if strings.Contains(stringifiedBody, "ZERO_RESULTS") {
-		// fmt.Println("Hmm, it seems that's not a valid location.  Let's try again.")
 		return nil, errors.New("Hmm, it seems that's not a valid location.Let's try again.")
 	}
 
@@ -106,7 +106,7 @@ func geoCallRepeater() {
 		var err error
 		value, err = MakeGeolocationCall(preparsedGeoUrl)
 		if err != nil {
-			fmt.Println("Hmm, it seems that's not a valid location.  Let's try again.")
+			color.Red("Hmm, it seems that's not a valid location.  Let's try again.")
 			time.Sleep(2 * time.Second) // wait 2 seconds before retrying
 		}
 		return attempt < 3, err // try 3 times
@@ -129,8 +129,6 @@ func GetLatitude() (latitude string) {
 	geoCallRepeater()
 	parsedJson, err := gabs.ParseJSON([]byte(GeoURLResponseBody))
 	if err != nil {
-		fmt.Print("Getlat json parse error: ")
-		fmt.Println(err)
 	}
 	lat := parsedJson.Path("results.geometry.location.lat").Data()
 	// Convert latitude and longitude to strings so they can be interpolated into weatherurl
@@ -144,8 +142,6 @@ func GetLatitude() (latitude string) {
 func GetLongitude() (longitude string) {
 	parsedJson, err := gabs.ParseJSON([]byte(GeoURLResponseBody))
 	if err != nil {
-		fmt.Print("Getlong JSON parse error: ")
-		fmt.Println(err)
 	}
 	long := parsedJson.Path("results.geometry.location.lng").Data()
 	stringifiedLongitude := fmt.Sprint(long)
@@ -155,14 +151,14 @@ func GetLongitude() (longitude string) {
 }
 
 func introduceWeatherRequest() {
-	fmt.Println("\nGot it.  Now, what kind of weather data would you like?")
+	color.Cyan("\nGot it.  Now, what kind of weather data would you like?")
 }
 
 var userRequest string
 
 func GetUserRequest() string {
 	checkinput := bufio.NewReader(os.Stdin)
-	fmt.Println(`Here are your choices:
+	color.Cyan(`Here are your choices:
 	* Text summary of the next hour's weather. --> Enter "minutely"
 	* Percent chance of precipitation in the next hour. --> Enter "hprecip"
 	* Temperature that it currently feels like. --> Enter "feelslike"
@@ -222,7 +218,7 @@ func MakeWeatherApiCall() {
 		log.Fatal(errGet)
 	}
 	if weatherres.StatusCode != 200 {
-		fmt.Println("Oops, that request didn't work.  Let's try again.")
+		color.Red("Oops, that request didn't work.  Let's try again.")
 		retryWeatherCall()
 	}
 
@@ -264,25 +260,25 @@ func userRequestSwitch() {
 	switch userRequest {
 	case "minutely":
 		if minutecast != nil {
-			fmt.Println("\nMinutecast: ", minutecast)
+			color.Cyan("\nMinutecast: ", minutecast)
 		} else {
-			fmt.Println("Darn!  I couldn't get that data.")
+			color.Red("Darn!  I couldn't get that data.")
 		}
 	case "hprecip":
-		fmt.Println("\nChance of precipitation in next hour: ", precipInNextHour, "%.")
+		color.Cyan("\nChance of precipitation in next hour: ", precipInNextHour, "%.")
 	case "feelslike":
-		fmt.Println("\nIt feels like it's", feelsLike, "°F.")
+		color.Cyan("\nIt feels like it's", feelsLike, "°F.")
 	case "humidity":
-		fmt.Println("\nRight now the humidity's at", humidityPercent, "%.")
+		color.Cyan("\nRight now the humidity's at", humidityPercent, "%.")
 	case "windspeed":
-		fmt.Println("\nThe wind's blowing", windSpeed, "miles per hour.")
+		color.Cyan("\nThe wind's blowing", windSpeed, "miles per hour.")
 	case "visibility":
-		fmt.Println("\nRight now you can see about", visibility, "miles.")
+		color.Cyan("\nRight now you can see about", visibility, "miles.")
 	case "exit":
-		fmt.Println("\nOk, bye! 🤙")
+		color.Cyan("\nOk, bye! 🤙")
 		os.Exit(0)
 	default:
-		fmt.Println("Sorry, I didn't quite catch that.")
+		color.Red("Sorry, I didn't quite catch that.")
 		GetUserRequest()
 	}
 
@@ -297,11 +293,11 @@ func stayOrExitSwitch() {
 		userRequestSwitch()
 		stayOrExitSwitch()
 	case "exit":
-		fmt.Println("\nOk, bye! 🤙")
+		color.Cyan("\nOk, bye! 🤙")
 		os.Exit(0)
 	default:
-		fmt.Println("\nSorry, didn't quite get that.  Can you try again?")
-		checkfinished.IsUserDone()
+		color.Red("\nSorry, didn't quite get that.  Can you try again?")
+		stayOrExitSwitch()
 	}
 }
 
