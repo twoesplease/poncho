@@ -30,8 +30,6 @@ func GetCity() string {
 	return cityname
 }
 
-// var cityname = GetCity()
-
 func GetState() string {
 	checkinput := bufio.NewReader(os.Stdin)
 	fmt.Println("\nAnd what's the 2-letter all-caps abbreviation for the state?")
@@ -39,8 +37,6 @@ func GetState() string {
 	stateabbrev = strings.TrimSuffix(stateabbrev, "\n")
 	return stateabbrev
 }
-
-// var statename = GetState()
 
 func LoadEnvVars() {
 	err := godotenv.Load(".gitignore/key.txt")
@@ -98,7 +94,6 @@ func MakeGeolocationCall(url string) ([]byte, error) {
 
 	if readErr != nil {
 		log.Fatal(readErr)
-		fmt.Println("Geo Response code: ", Res.StatusCode)
 	}
 	GeoURLResponseBody = Output
 	return Output, nil
@@ -146,8 +141,6 @@ func GetLatitude() (latitude string) {
 	return latWithoutBrackets
 }
 
-// var latitude = GetLatitude()
-
 func GetLongitude() (longitude string) {
 	parsedJson, err := gabs.ParseJSON([]byte(GeoURLResponseBody))
 	if err != nil {
@@ -160,8 +153,6 @@ func GetLongitude() (longitude string) {
 	longWithoutBrackets := strings.TrimSuffix(longWithoutLeftBracket, "]")
 	return longWithoutBrackets
 }
-
-// var longitude = GetLongitude()
 
 func introduceWeatherRequest() {
 	fmt.Println("\nGot it.  Now, what kind of weather data would you like?")
@@ -182,8 +173,6 @@ func GetUserRequest() string {
 	return request
 }
 
-// var userRequest = GetUserRequest()
-
 func GetWeatherApiKey() string {
 	LoadEnvVars()
 	getWeatherKey := os.Getenv("DARKSKY_KEY")
@@ -198,6 +187,8 @@ type WeatherSubValues struct {
 	Latitude   string
 	Longitude  string
 }
+
+var parsedWeatherJSON *gabs.Container
 
 func MakeWeatherApiCall() {
 	substitute := WeatherSubValues{weatherApiKey, GetLatitude(), GetLongitude()}
@@ -227,19 +218,8 @@ func MakeWeatherApiCall() {
 	if errGet != nil {
 		log.Fatal(errGet)
 	}
-	fmt.Println("Status code: ", weatherres.StatusCode)
 	if weatherres.StatusCode != 200 {
 		fmt.Println("Oops, that request didn't work.  Let's try again.")
-		// cityname = ""
-		// statename = ""
-		// latitude = ""
-		// longitude = ""
-		// parsed_weatherurl.Reset()
-		// stringifiedParsedWeatherUrl = ""
-		// tmpl2 = {{""}}
-		// err2 = nil
-		// weatherreq = nil
-		// weatherres = nil
 		retryWeatherCall()
 	}
 
@@ -248,20 +228,26 @@ func MakeWeatherApiCall() {
 		log.Fatal(errRead)
 	}
 
-	parsedWeatherJson, err := gabs.ParseJSON([]byte(weatheroutput))
+	JSONoutput, err := gabs.ParseJSON([]byte(weatheroutput))
+	parsedWeatherJSON = JSONoutput
 
-	minutecast := parsedWeatherJson.Path("minutely.summary").Data()
+	GetUserRequest()
+	userRequestSwitch()
+	stayOrExitSwitch()
+}
 
-	rawHPrecipData := parsedWeatherJson.Path("hourly.data.0.precipProbability").Data()
+func userRequestSwitch() {
+	minutecast := parsedWeatherJSON.Path("minutely.summary").Data()
+
+	rawHPrecipData := parsedWeatherJSON.Path("hourly.data.0.precipProbability").Data()
 	if rawHPrecipData == nil {
 		rawHPrecipData = 0
 	}
 	precipInNextHour := rawHPrecipData.(int) * 100
 
-	feelsLike := parsedWeatherJson.Path("currently.apparentTemperature").Data()
+	feelsLike := parsedWeatherJSON.Path("currently.apparentTemperature").Data()
 	feelsLike = fmt.Sprint(feelsLike)
 
-	GetUserRequest()
 	switch userRequest {
 	case "minutely":
 		if minutecast != nil {
@@ -281,12 +267,16 @@ func MakeWeatherApiCall() {
 		GetUserRequest()
 	}
 
+}
+
+func stayOrExitSwitch() {
 	var stayOrExit = checkfinished.IsUserDone()
 
 	switch stayOrExit {
 	case "more please":
 		GetUserRequest()
-		MakeWeatherApiCall()
+		userRequestSwitch()
+		stayOrExitSwitch()
 	case "exit":
 		fmt.Println("\nOk, bye! 🤙")
 		os.Exit(0)
@@ -294,18 +284,9 @@ func MakeWeatherApiCall() {
 		fmt.Println("\nSorry, didn't quite get that.  Can you try again?")
 		checkfinished.IsUserDone()
 	}
-
 }
 
 func retryWeatherCall() {
-	// cityname = ""
-	// statename = ""
-	// GeoURLResponseBody = nil
-	// latitude = ""
-	// longitude = ""
-	// userRequest = ""
-	// Greeting()
-
 	//*** Adding GetCity() & GetState() function calls below prevent this from an infinite loop
 	// when nil latitude and longitude data are returned ***//
 	GetCity()
