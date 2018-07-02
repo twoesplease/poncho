@@ -166,6 +166,9 @@ func GetUserRequest() string {
 	* Text summary of the next hour's weather. --> Enter "minutely"
 	* Percent chance of precipitation in the next hour. --> Enter "hprecip"
 	* Temperature that it currently feels like. --> Enter "feelslike"
+	* Current humidity level. --> Enter "humidity"
+	* Current wind speed. --> Enter "windspeed"
+	* Current visibility in miles. --> Enter "visibility"
 	* Exit without getting weather data. --> Enter "exit"`)
 	request, _ := checkinput.ReadString('\n')
 	request = strings.TrimSuffix(request, "\n")
@@ -248,6 +251,16 @@ func userRequestSwitch() {
 	feelsLike := parsedWeatherJSON.Path("currently.apparentTemperature").Data()
 	feelsLike = fmt.Sprint(feelsLike)
 
+	rawHumidityData := parsedWeatherJSON.Path("currently.humidity").Data()
+	if rawHumidityData == nil {
+		rawHumidityData = 0
+	}
+	humidityPercent := rawHumidityData.(float64) * 100
+
+	windSpeed := parsedWeatherJSON.Path("currently.windSpeed").Data()
+
+	visibility := parsedWeatherJSON.Path("currently.visibility").Data()
+
 	switch userRequest {
 	case "minutely":
 		if minutecast != nil {
@@ -256,9 +269,15 @@ func userRequestSwitch() {
 			fmt.Println("Darn!  I couldn't get that data.")
 		}
 	case "hprecip":
-		fmt.Println("\nChance of precipitation in next hour: ", precipInNextHour, "%")
+		fmt.Println("\nChance of precipitation in next hour: ", precipInNextHour, "%.")
 	case "feelslike":
-		fmt.Println("\nIt feels like it's", feelsLike, "°F")
+		fmt.Println("\nIt feels like it's", feelsLike, "°F.")
+	case "humidity":
+		fmt.Println("\nRight now the humidity's at", humidityPercent, "%.")
+	case "windspeed":
+		fmt.Println("\nThe wind's blowing", windSpeed, "miles per hour.")
+	case "visibility":
+		fmt.Println("\nRight now you can see about", visibility, "miles.")
 	case "exit":
 		fmt.Println("\nOk, bye! 🤙")
 		os.Exit(0)
@@ -297,8 +316,5 @@ func retryWeatherCall() {
 
 func main() {
 	Greeting()
-	// GetCity()
-	// GetState()
-	// MakeGeolocationCall(preparsedGeoUrl)
 	MakeWeatherApiCall()
 }
