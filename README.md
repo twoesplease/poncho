@@ -10,9 +10,9 @@ and article from Codecademy with more information about command line interfaces.
 [this resource](https://golang.org/doc/install) can help out.
 
 ### Dependencies ###
-Poncho relies on a few dependencies that you'll also need to have installed on your computer to run properly.  For each of the github links under the
-`import` statement in `poncho.go`, run the command `go get` + `the github url` to install that dependency on your computer.  You'll need to be inside of
-the directory you've cloned this repo to in order to do os.
+Poncho relies on a few dependencies that you'll also need to have installed on your computer to run properly. This project uses the `dep` library to help
+with managing those.  To install those dependencies on your machine, [install dep](https://golang.github.io/dep/docs/installation.html) 
+and then run the `dep ensure` command inside the directory where the app lives.
 
 ## Use ##
 Once you've cloned Poncho and run `go get` for its dependencies, you can use the command `go run poncho.go` to start it up.  The app will then tell you what to do.  
